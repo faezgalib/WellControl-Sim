@@ -366,14 +366,22 @@ export class Sim {
   _cleanup() {
     const a = this.ann;
     for (let i = a.length - 1; i >= 0; i--) {
-      if (a[i].k === 'L' && a[i].v <= 1e-7) a.splice(i, 1);
-      else if (a[i].k === 'G' && a[i].n <= 1e-9) a.splice(i, 1);
+      if (a[i].k === 'L' && (a[i].nd > 1e-6 ? a[i].v <= 1e-7 : a[i].v <= 1e-4)) {
+        a.splice(i, 1);
+      } else if (a[i].k === 'G' && a[i].n <= 1e-5) a.splice(i, 1);
+    }
+    // OBM bookkeeping: a tiny fresh slug sandwiched between two charged slices joins them
+    for (let i = a.length - 2; i >= 1; i--) {
+      const m = a[i], lo = a[i - 1], hi = a[i + 1];
+      if (m.k === 'L' && !(m.nd > 1e-6) && m.v < 0.03 && lo.k === 'L' && lo.nd > 1e-6 && hi.k === 'L' && hi.nd > 1e-6) {
+        const v = lo.v + m.v; lo.rho = (lo.rho * lo.v + m.rho * m.v) / v; lo.v = v; a.splice(i, 1);
+      }
     }
     // gas bubbles separated by a small liquid slug behave as one swarm: merge them
     for (let i = 0; i < a.length - 2; i++) {
       if (a[i].k !== 'G') continue;
       while (i + 2 < a.length && a[i + 1].k === 'L' && a[i + 1].v < 3 && a[i + 2].k === 'G') {
-        a[i].n += a[i + 2].n;
+        a[i].n += a[i + 2].n; a[i].bo = a[i].bo || a[i + 2].bo;
         const liq = a[i + 1];
         a.splice(i + 1, 2);
         a.splice(i, 0, liq);
@@ -382,11 +390,10 @@ export class Sim {
     }
     for (let i = a.length - 2; i >= 0; i--) {
       const x = a[i], y = a[i + 1];
-      if (x.k === 'G' && y.k === 'G') { x.n += y.n; a.splice(i + 1, 1); continue; }
-      if (x.k === 'L' && y.k === 'L' && !!x.w === !!y.w && Math.abs(x.rho - y.rho) < 0.004) {
-        const charged = x.nd > 1e-6 || y.nd > 1e-6;
-        const bothCharged = x.nd > 1e-6 && y.nd > 1e-6;
-        if (!charged || bothCharged) {
+      if (x.k === 'G' && y.k === 'G') { x.n += y.n; x.bo = x.bo || y.bo; a.splice(i + 1, 1); continue; }
+      if (x.k === 'L' && y.k === 'L' && !!x.w === !!y.w) {
+        const cx = x.nd > 1e-6, cy = y.nd > 1e-6;
+        if ((!cx && !cy && Math.abs(x.rho - y.rho) < 0.004) || (cx && cy)) {
           const v = x.v + y.v;
           x.rho = (x.rho * x.v + y.rho * y.v) / v;
           x.v = v; x.nd += y.nd;
@@ -398,10 +405,13 @@ export class Sim {
     while (a.length > 90) {
       let best = -1, bd = Infinity;
       for (let i = 0; i < a.length - 1; i++) {
-        if (a[i].k === 'L' && a[i + 1].k === 'L' && !!a[i].w === !!a[i + 1].w) {
+        if (a[i].k === 'L' && a[i + 1].k === 'L' && !!a[i].w === !!a[i + 1].w && (a[i].nd > 1e-6) === (a[i + 1].nd > 1e-6)) {
           const d = Math.abs(a[i].rho - a[i + 1].rho);
           if (d < bd) { bd = d; best = i; }
         }
+      }
+      if (best < 0) {
+        for (let i = 0; i < a.length - 1; i++) if (a[i].k === 'L' && a[i + 1].k === 'L' && !!a[i].w === !!a[i + 1].w) { const d = Math.min(a[i].v, a[i + 1].v); if (d < bd) { bd = d; best = i; } }
       }
       if (best < 0) break;
       const x = a[best], y = a[best + 1];
@@ -447,29 +457,51 @@ export class Sim {
     // dissolve free gas into mud directly above it
     for (let i = 0; i < a.length - 1; i++) {
       const gI = a[i];
-      if (gI.k !== 'G') continue;
+      if (gI.k !== 'G' || gI.bo) continue; // gas that has broken out stays free
       const up = a[i + 1];
       if (up.k !== 'L') continue;
       const pAbs = (gI.pTop ?? this.s.pform) + 14.7;
       const perBbl = this.oilFrac * this.solub * pAbs / SCF_LBMOL / UNDERSAT; // lbmol per bbl mud
+      // grow an existing charged slice directly above (carving fresh mud from above it), else start a new slice
+      let slice = up.nd > 1e-6 ? up : null;
+      let src = slice ? a[i + 2] : up;
+      if (slice && (!src || src.k !== 'L' || src.nd > 1e-6)) {
+        // fill the slice to its limit first
+        const room = Math.max(0, (slice.v - slice.nd * DISS_VOL) * perBbl - slice.nd);
+        const n0 = Math.min(room, gI.n);
+        slice.nd += n0; slice.v += n0 * DISS_VOL; gI.n -= n0;
+        if (gI.n <= 1e-5) { a.splice(i, 1); i--; continue; }
+        // then use the nearest fresh mud higher up (gas contacts more mud as it disperses)
+        let j = i + 2;
+        while (j < a.length && !(a[j].k === 'L' && a[j].nd <= 1e-6 && !a[j].w)) j++;
+        if (j >= a.length) continue;
+        src = a[j];
+        slice = a[j - 1].k === 'L' && a[j - 1].nd > 1e-6 ? a[j - 1] : null;
+        if (!slice) { slice = { k: 'L', v: 0, rho: src.rho, nd: 0, pTop: src.pBot, pBot: src.pBot }; a.splice(j, 0, slice); }
+      }
       const need = gI.n / perBbl;
-      const take = Math.min(need, up.v);
+      const take = Math.min(need, src.v);
       const n = take * perBbl;
-      const frac = take / up.v;
-      const ndMoved = up.nd * frac;
-      up.v -= take; up.nd -= ndMoved;
-      const vol = take + n * DISS_VOL;
-      const rho = (up.rho * take * 42 + n * MW_GAS) / (vol * 42);
-      const slice = { k: 'L', v: vol, rho, nd: n + ndMoved };
+      const ndMoved = src.nd * (take / src.v);
+      src.v -= take; src.nd -= ndMoved;
+      const addVol = take + n * DISS_VOL;
+      const addMass = src.rho * take * 42 + n * MW_GAS;
+      if (slice) {
+        const mass = slice.rho * slice.v * 42 + addMass;
+        slice.v += addVol; slice.nd += n + ndMoved; slice.rho = mass / (slice.v * 42);
+      } else {
+        slice = { k: 'L', v: addVol, rho: addMass / (addVol * 42), nd: n + ndMoved, pTop: gI.pTop, pBot: gI.pTop };
+        a.splice(i + 1, 0, slice);
+      }
       gI.n -= n;
-      a.splice(i + 1, 0, slice);
-      if (up.v <= 1e-9) a.splice(i + 2, 1);
-      if (gI.n <= 1e-9) { a.splice(i, 1); i--; }
+      const si = a.indexOf(src);
+      if (src.v <= 1e-9 && si >= 0) a.splice(si, 1);
+      if (gI.n <= 1e-5) { a.splice(i, 1); i--; }
     }
     // break out where pressure has dropped below bubble point
     for (let i = a.length - 1; i >= 0; i--) {
       const it = a[i];
-      if (it.k !== 'L' || it.nd <= 1e-7) continue;
+      if (it.k !== 'L' || it.nd <= 1e-7 || it.pTop === undefined) continue;
       const pMid = ((it.pTop ?? 0) + (it.pBot ?? 0)) / 2;
       const oilVol = Math.max(it.v - it.nd * DISS_VOL, 0) * this.oilFrac;
       const cap = oilVol * this.solub * (pMid + 14.7) / SCF_LBMOL;
@@ -479,8 +511,8 @@ export class Sim {
         it.v -= rel * DISS_VOL;
         it.rho = Math.min(this.omw * 1.5, (it.rho * (it.v + rel * DISS_VOL) * 42 - rel * MW_GAS) / (it.v * 42));
         const above = a[i + 1];
-        if (above && above.k === 'G') above.n += rel;
-        else a.splice(i + 1, 0, { k: 'G', n: rel, vol: 0 });
+        if (above && above.k === 'G') { above.n += rel; above.bo = true; }
+        else a.splice(i + 1, 0, { k: 'G', n: rel, vol: 0, bo: true });
       }
     }
   }

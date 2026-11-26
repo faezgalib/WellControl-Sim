@@ -35,7 +35,7 @@ export function makeScenario(opts = {}) {
   const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
   const r = rng(seed);
   const td = round(between(r, 8500, 12500), 50);
-  const shoeDepth = round(td * between(r, 0.5, 0.62), 50);
+  const shoeDepth = round(td * between(r, 0.55, 0.7), 50);
   const casing = pick(r, [{ od: 9.625, id: 8.681, hole: 8.5 }, { od: 9.625, id: 8.835, hole: 8.5 }, { od: 13.375, id: 12.415, hole: 12.25 }]);
   const big = casing.hole > 10;
   const dp = { od: 5, id: 4.276 };
@@ -46,7 +46,7 @@ export function makeScenario(opts = {}) {
   const pform = Math.round(0.052 * omw * td + sidpp);
   // Leak-off test at the shoe
   const testMw = round(omw - between(r, 0.2, 0.8), 0.1);
-  const fracEmw = omw + between(r, 2.4, 3.6);
+  const fracEmw = omw + between(r, 3.0, 4.2);
   const lotPsi = round((fracEmw - testMw) * 0.052 * shoeDepth, 10);
   const pumpOutput = big ? 0.119 : pick(r, [0.1, 0.105, 0.112]);
   const scrSpm = [30, 40];

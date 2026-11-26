@@ -7,7 +7,6 @@ export function h(tag, attrs = {}, ...children) {
     else if (k === 'class') el.setAttribute('class', v);
     else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
     else if (k === 'ref') v(el);
-    else if (k === 'html') el.innerHTML = v;
     else el.setAttribute(k, v === true ? '' : v);
   }
   append(el, children);

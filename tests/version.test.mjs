@@ -28,3 +28,13 @@ test('certification bodies are only named in the not-affiliated disclaimer', () 
   }
   assert.match(read('js/disclaimer.js'), /not affiliated with, endorsed by or connected to IWCF/);
 });
+
+test('every precached file is included in the Pages deploy', () => {
+  const sw = read('sw.js');
+  const staged = read('.github/workflows/pages.yml').match(/cp -r ([^\n]+) _site\//)[1].split(/\s+/);
+  const files = [...sw.matchAll(/'\.\/([^']*)'/g)].map((m) => m[1]).filter(Boolean);
+  for (const f of files) {
+    const top = f.split('/')[0];
+    assert.ok(staged.includes(top), `${f} is precached by sw.js but "${top}" is not copied to _site in pages.yml`);
+  }
+});

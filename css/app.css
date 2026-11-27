@@ -286,4 +286,6 @@ table.sched tr.cur td { color: var(--amber); font-weight: 700; }
 .more-sec h2 { font-size: 17px; font-weight: 700; }
 .mrow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #22272e; font-size: 14px; }
 .warnnote { color: var(--amber) !important; }
+.more-sec.notice { background: #1a160f; border-color: #5a4523; gap: 8px; }
+.more-sec.notice p { color: var(--text2); }
 .updatebox { display: flex; gap: 14px; align-items: center; width: 100%; margin-top: 10px; background: #1a160f; border-color: #5a4523; }

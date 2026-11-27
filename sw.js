@@ -2,7 +2,7 @@
 const VERSION = 'wcsim-0.2.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './version.json', './css/app.css',
-  './js/app.js', './js/store.js', './js/version.js',
+  './js/app.js', './js/store.js', './js/version.js', './js/disclaimer.js',
   './js/core/engine.js', './js/core/geometry.js', './js/core/scenario.js', './js/core/killsheet.js', './js/core/procedure.js', './js/core/analysis.js',
   './js/ui/dom.js', './js/ui/sim.js', './js/ui/charts.js', './js/ui/killsheet-form.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',

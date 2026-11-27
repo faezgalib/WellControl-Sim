@@ -5,6 +5,7 @@ import { killSheetView } from './ui/killsheet-form.js';
 import { drawMargin } from './ui/charts.js';
 import { listSessions, getSession, deleteSession, requestPersist, getAllSessions, importSessions, clearSessions, storageEstimate } from './store.js';
 import { APP_VERSION, RELEASE_DATE, RELEASE_NOTES } from './version.js';
+import { DISCLAIMER_TITLE, DISCLAIMER } from './disclaimer.js';
 
 const appEl = document.getElementById('app');
 let cleanup = null;
@@ -326,12 +327,15 @@ function more() {
       h('div', { class: 'row', style: { alignItems: 'flex-start', gap: '12px' } }, h('span', { class: 'mono small', style: { width: '52px', flex: '0 0 52px', color: i ? 'var(--muted)' : 'var(--amber)' } }, `v${r.v}`), h('span', { class: 'small', style: { color: i ? 'var(--muted)' : 'var(--text2)' } }, r.notes)))),
     h('div', { class: 'small muted', style: { marginTop: '10px' } }, 'Needs internet. Offline, the app keeps running the installed version.'));
 
+  const notice = h('section', { class: 'card more-sec notice', role: 'note', 'aria-label': 'Disclaimer' },
+    h('div', { class: 'row' }, icon('info', 20, '#f2a93b'), h('h2', {}, DISCLAIMER_TITLE)),
+    ...DISCLAIMER.map((t) => h('p', { class: 'small' }, t)));
   const about = sec('info', 'About',
-    h('p', { class: 'small' }, 'Personal training tool for practising well control procedures. Independent project: not affiliated with, endorsed by or connected to any training, certification or industry organisation. Numbers follow general field rules of thumb, not a specific rig. Always follow your company procedures and course material.'),
+    h('p', { class: 'small' }, 'Personal tool for practising kick detection, shut-in, kill sheets and well kills on a tablet, online or offline.'),
     h('button', { type: 'button', class: 'btn', style: { alignSelf: 'flex-start' }, onClick: () => app.go('help') }, 'Quick reference'));
 
   shell('more', h('div', { class: 'page' }, h('h1', {}, 'More'),
-    h('div', { class: 'more-grid' }, h('div', { class: 'col', style: { gap: '16px' } }, units, course, backup), h('div', { class: 'col', style: { gap: '16px' } }, version, about))));
+    h('div', { class: 'more-grid' }, h('div', { class: 'col', style: { gap: '16px' } }, units, course, backup), h('div', { class: 'col', style: { gap: '16px' } }, notice, version, about))));
   refreshInfo();
 }
 

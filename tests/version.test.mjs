@@ -13,13 +13,18 @@ test('version is the same everywhere', () => {
 
 test('every app file is precached for offline use', () => {
   const sw = read('sw.js');
-  for (const f of ['js/app.js', 'js/version.js', 'js/store.js', 'js/ui/sim.js', 'js/core/engine.js', 'css/app.css', 'version.json']) {
+  for (const f of ['js/app.js', 'js/version.js', 'js/store.js', 'js/ui/sim.js', 'js/core/engine.js', 'css/app.css', 'version.json', 'js/disclaimer.js']) {
     assert.ok(sw.includes(`'./${f}'`), `${f} missing from sw.js`);
   }
 });
 
-test('no claims of affiliation in user-facing files', () => {
-  for (const f of ['index.html', 'manifest.webmanifest', 'README.md', 'js/app.js', 'js/ui/sim.js', 'js/ui/killsheet-form.js']) {
-    assert.doesNotMatch(read(f), /\b(IWCF|IADC)\b/i, f);
+test('certification bodies are only named in the not-affiliated disclaimer', () => {
+  for (const f of ['index.html', 'manifest.webmanifest', 'README.md', 'js/app.js', 'js/ui/sim.js', 'js/ui/killsheet-form.js', 'js/disclaimer.js', 'js/version.js']) {
+    const text = read(f);
+    // join wrapped lines into sentences, then every sentence naming a body must say "not affiliated"
+    for (const sentence of text.replace(/\n(?!\n)/g, ' ').split(/(?<=[.!?])\s+|\n\n/)) {
+      if (/\b(IWCF|IADC)\b/i.test(sentence)) assert.match(sentence, /not affiliated/i, `${f}: ${sentence.slice(0, 120)}`);
+    }
   }
+  assert.match(read('js/disclaimer.js'), /not affiliated with, endorsed by or connected to IWCF/);
 });

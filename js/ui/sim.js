@@ -1,13 +1,13 @@
 import { h, svg, clear, fmt, fmtTime, toast, modal, holdButton } from './dom.js';
 import { Sim, BOP_LABEL } from '../core/engine.js';
-import { Coach } from '../core/procedure.js';
+import { Coach, maaspCheck } from '../core/procedure.js';
 import { analyse } from '../core/analysis.js';
 import { schedule, scheduleAt } from '../core/killsheet.js';
 import { drawWell, drawTrend } from './charts.js';
 import { killSheetView } from './killsheet-form.js';
 import { saveSession } from '../store.js';
 
-const SPEEDS = [1, 2, 5, 10, 20];
+const SPEEDS = [1, 2, 5, 10, 20, 30];
 const ARC = 320, CIRC = 427;
 
 export function simScreen(app, scen, opts = {}) {
@@ -19,6 +19,7 @@ export function simScreen(app, scen, opts = {}) {
   };
   ses.coach = new Coach(ses);
   let speed = 1, paused = false, tab = 'kill', showSteps = false, trendWin = 1800, ctrlChoke = null;
+  let maaspShown = 0;
   let raf = 0, lastFrame = performance.now(), acc = 0, lastUi = 0, seenEvents = 0, wakeLock = null, ended = false;
   const R = {};
 
@@ -238,7 +239,7 @@ export function simScreen(app, scen, opts = {}) {
   }
 
   // ---------- coaching mode: stop and explain before a procedural mistake ----------
-  function coaching(issues, onProceed, { proceedLabel = 'Do it anyway', backLabel = 'Go back', fixLabel = null, onFix = null } = {}) {
+  function coaching(issues, onProceed, { proceedLabel = 'Do it anyway', backLabel = 'Go back', fixLabel = null, onFix = null, info = false } = {}) {
     const wasPaused = paused; paused = true;
     let m = null;
     const done = (fn) => { m.close(); paused = wasPaused; fn?.(); };
@@ -251,9 +252,10 @@ export function simScreen(app, scen, opts = {}) {
         h('p', { class: 'do' }, h('b', {}, 'Correct action: '), it.fix))),
       h('p', { class: 'small muted' }, 'Simulation paused. Coaching warnings only appear with Coach ON — the debrief records this either way.'),
       h('div', { class: 'actions' },
-        h('button', { type: 'button', class: 'btn', onClick: () => done(null) }, backLabel),
-        fixLabel ? h('button', { type: 'button', class: 'btn primary', onClick: () => done(onFix) }, fixLabel) : null,
-        h('button', { type: 'button', class: 'btn ghost danger', onClick: () => done(onProceed) }, proceedLabel)),
+        info ? h('button', { type: 'button', class: 'btn primary', onClick: () => done(null) }, 'Understood — continue') : null,
+        info ? null : h('button', { type: 'button', class: 'btn', onClick: () => done(null) }, backLabel),
+        info ? null : fixLabel ? h('button', { type: 'button', class: 'btn primary', onClick: () => done(onFix) }, fixLabel) : null,
+        info ? null : h('button', { type: 'button', class: 'btn ghost danger', onClick: () => done(onProceed) }, proceedLabel)),
     ]);
     m.box.classList.add('coachmodal');
   }
@@ -417,6 +419,20 @@ export function simScreen(app, scen, opts = {}) {
     setArc(R.dpArc, dp ?? 0, scaleFor(Math.max(dp ?? 0, tgt?.kind === 'dp' ? tgt.psi : 0)), tgt?.kind === 'dp' ? tgt.psi : null);
     setArc(R.cpArc, cp, scaleFor(Math.max(cp, tgt?.kind === 'cp' ? tgt.psi : 0)), tgt?.kind === 'cp' ? tgt.psi : null);
     const sv = ses.sheet.accepted ? ses.sheet.values : null;
+    const maaspNow = sv ? (sim.pits.suction === 'kill' && sim.killStart ? sv.newMaasp : sv.maasp) : L.maaspTrue;
+    if (ses.coachOn && !paused && !document.querySelector('.modal')) {
+      const mc = maaspCheck({ cp: L.cp, maasp: maaspNow, gasTop: L.gasTopDepth, shoe: sim.geo.shoe, sealed: L.sealed, shown: maaspShown });
+      if (mc.reset) maaspShown = 0;
+      else if (mc.show) {
+        maaspShown = mc.level;
+        const over = mc.level === 2;
+        coaching([{
+          title: over ? `Casing pressure is above MAASP (${fmt(L.cp)} / ${fmt(maaspNow)} psi)` : `Casing pressure is close to MAASP (${fmt(L.cp)} / ${fmt(maaspNow)} psi)`,
+          why: `The gas is still below the casing shoe (gas top ≈ ${fmt(L.gasTopDepth)} ft, shoe ${fmt(sim.geo.shoe)} ft). Until it passes the shoe, shoe pressure = casing pressure + mud hydrostatic down to the shoe, so going over MAASP can fracture the shoe: losses and possibly an underground blowout.${sv ? '' : ' (MAASP shown is the true value — complete the kill sheet to use your own.)'}`,
+          fix: 'Do not open the choke just to bring casing pressure down — bottom-hole pressure would drop and more gas would enter. Keep following your method (DP schedule or constant BHP). Watch the pits for losses. Options: slow the pump to cut annular friction (hold casing pressure while changing rate), and prepare for lost circulation. Once the gas is above the shoe, casing pressure can rise further without raising shoe pressure.',
+        }], null, { info: true });
+      }
+    }
     R.dpSub.textContent = dp === null ? (sim.stringTop === 'closed' ? 'FOSV closed — no reading' : 'String open — no gauge') : tgt?.kind === 'dp' ? `Target ${fmt(tgt.psi)} psi` : sv ? `ICP ${fmt(sv.icp)} · FCP ${fmt(sv.fcp)}` : (sim.s.floatValve ? 'Float valve in string' : '');
     R.cpSub.textContent = tgt?.kind === 'cp' ? `Hold ${fmt(tgt.psi)} psi` : sv ? `MAASP ${fmt(sim.pits.suction === 'kill' && sim.killStart ? sv.newMaasp : sv.maasp)} psi (kill sheet)` : (sim.hcr.open ? '' : 'HCR closed');
 

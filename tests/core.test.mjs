@@ -115,3 +115,16 @@ test('tripping: hole takes less than calculated fill when swabbing', () => {
   const actualFill = -sim.last.tripTankDelta;
   assert.ok(sim.trip.expectedFill - actualFill > 3, `expected ${sim.trip.expectedFill} actual ${actualFill}`);
 });
+
+test('MAASP coaching triggers only with gas below the shoe', async () => {
+  const { maaspCheck } = await import('../js/core/procedure.js');
+  const base = { maasp: 1000, shoe: 5000, sealed: true };
+  assert.equal(maaspCheck({ ...base, cp: 850, gasTop: 8000 }).show, false);          // 85 %: fine
+  assert.deepEqual(maaspCheck({ ...base, cp: 920, gasTop: 8000 }).level, 1);           // 92 %: warn
+  assert.equal(maaspCheck({ ...base, cp: 920, gasTop: 8000, shown: 1 }).show, false);  // already shown
+  assert.equal(maaspCheck({ ...base, cp: 1010, gasTop: 8000, shown: 1 }).show, true);  // now above MAASP
+  assert.equal(maaspCheck({ ...base, cp: 1200, gasTop: 4000 }).show, false);           // gas above shoe: no warning
+  assert.equal(maaspCheck({ ...base, cp: 1200, gasTop: null }).show, false);           // no free gas
+  assert.equal(maaspCheck({ ...base, cp: 950, gasTop: 8000, sealed: false }).show, false);
+  assert.equal(maaspCheck({ ...base, cp: 700, gasTop: 8000 }).reset, true);            // below 80 %: re-arm
+});

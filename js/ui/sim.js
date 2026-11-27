@@ -72,9 +72,18 @@ export function simScreen(app, scen, opts = {}) {
 
   const readout = (lbl, key, reset) => h('div', { class: 'card readout' }, h('div', { class: 'lbl' }, lbl), R[key] = h('div', { class: 'v' }, '—'),
     reset ? h('button', { type: 'button', class: 'btn sm reset', onClick: reset, 'aria-label': `Reset ${lbl}` }, '0') : null);
+  R.stkMiles = h('div', { class: 'miles' });
+  R.stkBar = h('div', { class: 'stkbar' });
+  const strokesCard = h('div', { class: 'card readout wide' },
+    h('div', { class: 'stkhead' },
+      h('div', { class: 'stkcount' }, h('div', { class: 'row', style: { gap: '6px' } }, h('div', { class: 'lbl' }, 'Strokes'),
+        h('button', { type: 'button', class: 'btn sm reset', onClick: () => sim.cmd('resetStrokes'), 'aria-label': 'Reset stroke counter' }, '0')),
+        R.roStk = h('div', { class: 'v' }, '—')),
+      R.stkMiles),
+    R.stkBar);
   const readouts = h('div', { class: 'readouts' },
     readout('Pump rate', 'roSpm'),
-    readout('Strokes', 'roStk', () => sim.cmd('resetStrokes')),
+    strokesCard,
     scen.mode === 'tripping' ? readout('Trip tank Δ', 'roPit', () => sim.cmd('resetPit')) : readout('Pit gain', 'roPit', () => sim.cmd('resetPit')),
     readout('Flow out', 'roFlow'));
 
@@ -137,7 +146,16 @@ export function simScreen(app, scen, opts = {}) {
     R.pumpStatus = h('div', { class: 'small', style: { fontWeight: 700 } }, '');
     R.pumpSpm = h('div', { class: 'big' }, '0');
     R.pumpTgt = h('div', { class: 'small muted' }, '');
-    R.pumpOnBtn = h('button', { type: 'button', class: 'btn', onClick: () => { const p = sim.pumps[sim.activePump]; if (!sim.cmd('pump', { on: !p.on }) && !p.on) toastLastInfo(); updateControls(); } }, 'Start pump');
+    const togglePump = () => { const p = sim.pumps[sim.activePump]; if (!sim.cmd('pump', { on: !p.on }) && !p.on) toastLastInfo(); updateControls(); };
+    R.pumpOnBtn = h('button', { type: 'button', class: 'btn', onClick: () => {
+      const p = sim.pumps[sim.activePump];
+      if (!p.on && ses.coachOn && sim.last.sealed && sim.method && sim.counters.strokes > 20) {
+        coaching([{ title: 'Stroke counter not reset', why: `The counter shows ${fmt(sim.counters.strokes)} strokes. The DP schedule and the bit / bottoms-up / cycle milestones count from zero at the start of each circulation.`, fix: 'Reset the stroke counter, then start the pump slowly while holding casing pressure.' }],
+          togglePump, { proceedLabel: 'Start without reset', fixLabel: 'Reset & start', onFix: () => { sim.cmd('resetStrokes'); togglePump(); } });
+        return;
+      }
+      togglePump();
+    } }, 'Start pump');
     const pumpCard = h('div', { class: 'card ctl' },
       h('div', { class: 'row' }, h('div', { class: 'lbl grow' }, 'Mud pump'), R.pumpSel),
       h('div', { class: 'row' }, R.pumpSpm, h('div', { class: 'grow' }), h('div', { class: 'col', style: { gap: '2px', alignItems: 'flex-end' } }, R.pumpStatus, R.pumpTgt)),
@@ -187,9 +205,90 @@ export function simScreen(app, scen, opts = {}) {
       h('div', { class: 'card ctl' }, h('div', { class: 'lbl' }, 'Kill pit'), R.killPit, h('button', { type: 'button', class: 'btn', onClick: openWeightUp }, 'Weight up kill pit…')));
   };
 
+  // ---------- stroke milestones (from the user's own kill sheet) ----------
+  let milesKey = '';
+  function updateMiles() {
+    const v = ses.sheet.accepted ? ses.sheet.values : null;
+    const stk = sim.counters.strokes;
+    const ok = (x) => Number.isFinite(x) && x > 0;
+    const marks = v ? [['To bit', v.stkBit], ['Bottoms-up', ok(v.stkBit) && ok(v.stkBu) ? v.stkBit + v.stkBu : NaN, v.stkBu], ['1 cycle', v.stkTotal]] : [];
+    const key = v ? marks.map((m) => m[1]).join('|') : 'none';
+    if (key !== milesKey) {
+      milesKey = key;
+      clear(R.stkMiles); clear(R.stkBar);
+      if (!v) { R.stkMiles.append(h('div', { class: 'small muted' }, 'Complete the kill sheet to see bit, bottoms-up and cycle strokes here.')); return; }
+      R.mileRows = marks.map(([lbl, at, own]) => {
+        const rem = h('span', { class: 'rem' });
+        R.stkMiles.append(h('div', { class: 'mile' }, h('span', { class: 'ml' }, lbl), h('b', { class: 'mono' }, ok(own ?? at) ? fmt(own ?? at) : '—'), rem));
+        return { at, rem };
+      });
+      const total = Math.max(...marks.map((m) => (ok(m[1]) ? m[1] : 0)), 1);
+      R.stkFill = h('div', { class: 'fill' });
+      R.stkBar.append(R.stkFill, ...marks.filter((m) => ok(m[1])).map(([lbl, at]) => h('div', { class: 'tick', style: { left: `${(at / total) * 100}%` }, title: lbl })));
+      R.stkTotal = total;
+    }
+    if (!R.mileRows) return;
+    for (const r of R.mileRows) {
+      if (!ok(r.at)) { r.rem.textContent = ''; continue; }
+      const left = Math.round(r.at - stk);
+      r.rem.textContent = left > 0 ? `${fmt(left)} left` : 'passed';
+      r.rem.classList.toggle('done', left <= 0);
+    }
+    R.stkFill.style.width = `${Math.min(100, (stk / R.stkTotal) * 100)}%`;
+  }
+
+  // ---------- coaching mode: stop and explain before a procedural mistake ----------
+  function coaching(issues, onProceed, { proceedLabel = 'Do it anyway', backLabel = 'Go back', fixLabel = null, onFix = null } = {}) {
+    const wasPaused = paused; paused = true;
+    let m = null;
+    const done = (fn) => { m.close(); paused = wasPaused; fn?.(); };
+    m = modal([
+      h('div', { class: 'coachtag' }, svgIcon(), 'COACHING MODE'),
+      h('h2', {}, issues.length > 1 ? 'Wait — check these first' : issues[0].title),
+      ...issues.map((it) => h('div', { class: 'coachitem' },
+        issues.length > 1 ? h('div', { class: 't' }, it.title) : null,
+        h('p', {}, it.why),
+        h('p', { class: 'do' }, h('b', {}, 'Correct action: '), it.fix))),
+      h('p', { class: 'small muted' }, 'Simulation paused. Coaching warnings only appear with Coach ON — the debrief records this either way.'),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn', onClick: () => done(null) }, backLabel),
+        fixLabel ? h('button', { type: 'button', class: 'btn primary', onClick: () => done(onFix) }, fixLabel) : null,
+        h('button', { type: 'button', class: 'btn ghost danger', onClick: () => done(onProceed) }, proceedLabel)),
+    ]);
+    m.box.classList.add('coachmodal');
+  }
+  function svgIcon() {
+    return svg('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'aria-hidden': 'true' },
+      svg('path', { d: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v6M12 7.5v.5' }));
+  }
+  function shutInIssues(k) {
+    if (!['annular', 'upr', 'lpr'].includes(k) || sim.last.sealed) return [];
+    const out = [];
+    const pump = sim.pumps[sim.activePump];
+    if (sim.pumpRate() > 0 && !pump.on) out.push({ title: `The pump is still slowing down (${Math.round(pump.spm)} spm)`, why: 'Mud is still going into the well until the pump has fully stopped. Closing now traps that pressure in a closed well.', fix: 'Wait until the pump rate reads 0, flow check, then close the BOP.' });
+    else if (sim.pumpRate() > 0) out.push({ title: 'The pump is still running', why: 'Closing the BOP with the pump on traps pump pressure in a closed well. Pressure climbs hundreds of psi per minute and can break down the shoe or lift the pop-off.', fix: 'Stop the pump and flow check, then close the BOP.' });
+    if (sim.rotary) out.push({ title: 'The string is still rotating', why: 'Closing on a rotating string damages the annular element or ram rubbers.', fix: 'Stop the rotary and pick up before closing the BOP.' });
+    if (k === 'upr' && !sim.spacedOut) out.push({ title: 'Not spaced out', why: 'A tool joint may be across the upper pipe ram, so the ram cannot seal.', fix: 'Pick up off bottom to space out, then close the ram — or use the annular.' });
+    if (sim.activeChoke().pos > 2) out.push({ title: `Choke is ${Math.round(sim.activeChoke().pos)}% open`, why: 'Hard shut-in needs the choke closed before the BOP. With the choke open the well keeps flowing through the choke line when the HCR opens (a soft shut-in).', fix: 'Close the choke first (Choke & pump tab), then close the BOP.' });
+    if (sim.mode === 'tripping' && sim.stringTop !== 'closed' && sim.stringTop !== 'connected') out.push({ title: sim.fosvInstalled ? 'FOSV still open' : 'No FOSV in the string', why: 'With the drill pipe open, the well can flow up the string once the annulus is closed.', fix: 'Set slips, stab the FOSV open, close it — then close the BOP.' });
+    return out;
+  }
+
   function bopToggle(k) {
     const b = sim.bop[k];
     const closing = b.state === 'open' || b.state === 'opening';
+    if (closing && ses.coachOn) {
+      const issues = shutInIssues(k);
+      if (issues.length) {
+        const fixPump = issues.some((i) => i.title.startsWith('The pump'));
+        coaching(issues, () => sim.cmd('bop', { el: k, close: true }), {
+          proceedLabel: `Close ${BOP_LABEL[k]} anyway`,
+          fixLabel: fixPump ? 'Stop the pump for me' : null,
+          onFix: () => { sim.cmd('pump', { on: false }); toast('Pump stopped — now flow check, then close the BOP'); },
+        });
+        return;
+      }
+    }
     if (k === 'bsr' && closing) {
       const m = modal([h('h2', {}, 'Close blind/shear rams?'), h('p', {}, 'There is pipe across the BOP. Closing the shear rams will cut the drill string. Last resort only.'),
         h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn', onClick: () => m.close() }, 'Cancel'), h('button', { type: 'button', class: 'btn danger', onClick: () => { sim.cmd('bop', { el: k, close: true }); m.close(); } }, 'Shear pipe'))]);
@@ -233,7 +332,7 @@ export function simScreen(app, scen, opts = {}) {
       onClose: () => m.close(),
       onAccept: (st) => {
         const n = (k) => parseFloat(st.entries[k]);
-        st.values = { kmw: n('kmw'), icp: n('icp'), fcp: n('fcp'), stkBit: n('stkBit'), stkTotal: n('stkTotal'), maasp: n('maasp'), newMaasp: n('newMaasp') };
+        st.values = { kmw: n('kmw'), icp: n('icp'), fcp: n('fcp'), stkBit: n('stkBit'), stkBu: n('stkBu'), stkTotal: n('stkTotal'), maasp: n('maasp'), newMaasp: n('newMaasp') };
         st.scrSpm = scen.scr[st.scrIndex].spm;
         st.accepted = true; st.acceptedAt = sim.t;
         m.close();
@@ -324,6 +423,7 @@ export function simScreen(app, scen, opts = {}) {
     const p = sim.pumps[sim.activePump];
     R.roSpm.replaceChildren(fmt(p.spm, 0), h('small', {}, ' spm'));
     R.roStk.replaceChildren(fmt(sim.counters.strokes), h('small', {}, ' stk'));
+    updateMiles();
     if (scen.mode === 'tripping') R.roPit.replaceChildren(fmt(L.tripTankDelta, 1), h('small', {}, ' bbl'));
     else R.roPit.replaceChildren((L.pitGain >= 0 ? '+' : '') + fmt(L.pitGain, 1), h('small', {}, ' bbl'));
     const qin = L.pumpQ;

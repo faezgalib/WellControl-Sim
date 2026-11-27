@@ -1,8 +1,12 @@
 name: Test and deploy to GitHub Pages
 
-# Runs only on pushes to main (i.e. after the owner merges a pull request) or when
-# the owner starts it by hand. It never runs on pull requests from forks.
+# Tests run on pull requests into main (read-only token, no secrets; fork PRs wait
+# for the owner's approval). Deploy runs only after a push to main (i.e. after the
+# owner merges) or when the owner starts it by hand, and then waits for the owner's
+# approval on the github-pages environment.
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -34,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Only this job may deploy, and only from main.
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     permissions:
       contents: read
       pages: write

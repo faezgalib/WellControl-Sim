@@ -1,7 +1,7 @@
 {
   "name": "Well Control Sim",
   "short_name": "WC Sim",
-  "description": "Well control simulator for IWCF Level 3/4 practice",
+  "description": "Personal well control practice simulator",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",

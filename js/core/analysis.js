@@ -198,6 +198,7 @@ export function analyse(ses) {
       duration: sim.t, influx: sim.counters.influx, secondary: sim.counters.influxAfterSeal, losses: sim.counters.losses,
       maxCp: Math.max(0, ...S.map((x) => x.cp)), maasp: s.fracShoePsi - 0.052 * s.mud.rho * s.well.shoe.depth,
       gasVented: sim.counters.gasVented * 379.4 / 1000,
+      gainAtSeal: sealedAt === null ? null : +(sim.mode === 'tripping' ? sim.counters.influx : Math.max(0, at(sealedAt).pit)).toFixed(1),
     },
   };
 }

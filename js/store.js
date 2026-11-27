@@ -38,3 +38,20 @@ export async function listSessions() {
 export async function requestPersist() {
   try { if (navigator.storage?.persist) await navigator.storage.persist(); } catch { /* ignore */ }
 }
+
+// ---- backup ----
+export const getAllSessions = () => tx('readonly', (st) => st.getAll()).then((x) => x || []);
+export const clearSessions = () => tx('readwrite', (st) => st.clear());
+export async function importSessions(list) {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const t = d.transaction(STORE, 'readwrite');
+    const s = t.objectStore(STORE);
+    for (const r of list) s.put(r);
+    t.oncomplete = () => resolve(list.length);
+    t.onerror = () => reject(t.error);
+  });
+}
+export async function storageEstimate() {
+  try { return await navigator.storage?.estimate?.(); } catch { return null; }
+}

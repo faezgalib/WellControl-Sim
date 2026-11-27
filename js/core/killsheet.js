@@ -1,4 +1,4 @@
-// IWCF-style surface BOP, vertical well kill sheet: calculations and line-by-line checking.
+// Surface BOP, vertical well kill sheet: calculations and line-by-line checking.
 // Rounding conventions used (to be confirmed against course material):
 //  - Kill mud density rounded UP to 0.1 ppg
 //  - Maximum allowable mud density rounded DOWN to 0.1 ppg

@@ -1,7 +1,6 @@
 # Well Control Sim
 
-Personal practice simulator for the IWCF Drilling Well Control Level 3/4 practical
-(surface BOP, vertical well, field units). Installable as an offline PWA on an
+Personal well control practice simulator (surface BOP, vertical well, field units). Installable as an offline PWA on an
 Android tablet.
 
 ## What it does (Phase 1)
@@ -18,12 +17,21 @@ Android tablet.
   A/B with % buttons and hold-to-move, two pumps, kill pit weight-up, suction line-up.
 - **Equipment problems** during the kill (chosen or random/hidden): choke plugging,
   choke washout, nozzle plugged, string washout, pump failure, annular not sealing.
-- **Kill sheet**: IWCF-style surface vertical sheet, line-by-line checking, worked
+- **Kill sheet**: surface BOP, vertical well kill sheet, line-by-line checking, worked
   solution, DP schedule built from your own numbers. Also a standalone trainer.
 - **Coach mode**: procedure steps, live target on the gauges and a BHP-vs-formation
   indicator. Turn it off to practise reading the gauges alone.
 - **Debrief**: what happened, when, why it matters and the correct action; BHP
   margin chart; history saved on the device (IndexedDB) with recurring issues.
+
+## Disclaimer
+
+Independent project for personal practice only. Not affiliated with, endorsed by or
+connected to IWCF (International Well Control Forum), IADC (International Association
+of Drilling Contractors) or any other training, certification or industry organisation.
+It is not official course material, not an exam or assessment tool, and does not lead
+to any certificate. Numbers follow general field rules of thumb, not a specific rig.
+Always follow your company procedures and your official course material.
 
 ## Physics model (short)
 
@@ -51,4 +59,6 @@ npm run serve         # http://localhost:8080
 3. Open the Pages URL in Chrome on the tablet → menu → **Install app**.
 4. Open it once while online; after that it works offline.
 
-After an update, open the app twice while online to pick up the new version.
+Updates: **More → Version & updates → Check for update → Install & reload**.
+Release steps: bump the version in `js/version.js`, `version.json`, `package.json`
+and `VERSION` in `sw.js` (the test suite checks they match).

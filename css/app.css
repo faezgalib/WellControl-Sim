@@ -26,7 +26,13 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-tap-highlight-color: transparent; }
-body { overscroll-behavior: none; }
+/* Feel like an installed app, not a web page:
+   no pull-to-refresh or rubber-band scrolling, no double-tap zoom delay,
+   no text selection or callout menus on controls (text in content stays selectable). */
+html, body { overscroll-behavior: none; touch-action: manipulation; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.shell-main, .tabpanel, .modal, .steps, .simbody { overscroll-behavior: contain; }
+button, .tab, .pill, .opt, .tile, nav, header, .gauge, .readout, canvas, svg { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+img, svg, canvas { -webkit-user-drag: none; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -289,3 +295,21 @@ table.sched tr.cur td { color: var(--amber); font-weight: 700; }
 .more-sec.notice { background: #1a160f; border-color: #5a4523; gap: 8px; }
 .more-sec.notice p { color: var(--text2); }
 .updatebox { display: flex; gap: 14px; align-items: center; width: 100%; margin-top: 10px; background: #1a160f; border-color: #5a4523; }
+
+/* phones: shell, header and tab bar fit narrow screens */
+@media (max-width: 600px) {
+  .brandbar { padding: 0 14px; gap: 10px; height: 60px; flex-basis: 60px; }
+  .brandbar .brand { font-size: 14px; letter-spacing: .05em; }
+  .netchip { padding: 6px 8px; }
+  .netchip .netlbl { display: none; }
+  .tabbar { gap: 0; padding: 0 4px env(safe-area-inset-bottom); }
+  .tab { flex: 1 1 0; min-width: 0; font-size: 11px; }
+  .home { padding: 8px 16px 16px; }
+  .hero { font-size: 30px; }
+  .setup { padding: 12px 16px 16px; }
+  .page { padding: 16px 16px 32px; }
+  .grid2 { grid-template-columns: 1fr; }
+  .lastsess { flex-wrap: wrap; }
+  .lastsess > .col { width: auto !important; flex: 1 1 100% !important; }
+  .histrow { grid-template-columns: 1fr; gap: 6px; }
+}

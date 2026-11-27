@@ -65,7 +65,7 @@ function brandHeader(right = null) {
   return h('header', { class: 'brandbar' }, logo(40),
     h('div', { class: 'brand' }, 'WELL CONTROL SIM'),
     h('div', { class: 'grow' }), right,
-    h('div', { class: 'netchip' + (navigator.onLine ? ' on' : '') }, h('span', { class: 'dotc' }), navigator.onLine ? 'Online · offline ready' : 'Offline'),
+    h('div', { class: 'netchip' + (navigator.onLine ? ' on' : ''), title: navigator.onLine ? 'Online · offline ready' : 'Offline' }, h('span', { class: 'dotc' }), h('span', { class: 'netlbl' }, navigator.onLine ? 'Online · offline ready' : 'Offline')),
     h('div', { class: 'mono small muted' }, `v${APP_VERSION}`));
 }
 /** Standard screen: brand header, scrolling content, tab bar. */
@@ -331,7 +331,10 @@ function more() {
     h('div', { class: 'row' }, icon('info', 20, '#f2a93b'), h('h2', {}, DISCLAIMER_TITLE)),
     ...DISCLAIMER.map((t) => h('p', { class: 'small' }, t)));
   const about = sec('info', 'About',
-    h('p', { class: 'small' }, 'Personal tool for practising kick detection, shut-in, kill sheets and well kills on a tablet, online or offline.'),
+    h('p', { class: 'small' }, 'Personal tool for practising kick detection, shut-in, kill sheets and well kills, online or offline.'),
+    h('div', { class: 'mrow' }, h('span', { class: 'grow' }, 'Optimised for'), h('b', {}, 'Laptop and tablet (landscape)')),
+    h('div', { class: 'mrow' }, h('span', { class: 'grow' }, 'Phone'), h('span', { class: 'small', style: { textAlign: 'right' } }, 'Home, Kill sheet, History and More work. Simulator: phone layout coming later — use landscape for now.')),
+    h('div', { class: 'mrow', style: { borderBottom: '0' } }, h('span', { class: 'grow' }, 'Install'), h('span', { class: 'small', style: { textAlign: 'right' } }, 'Chrome or Edge → Install app. Works offline after the first visit.')),
     h('button', { type: 'button', class: 'btn', style: { alignSelf: 'flex-start' }, onClick: () => app.go('help') }, 'Quick reference'));
 
   shell('more', h('div', { class: 'page' }, h('h1', {}, 'More'),
@@ -546,7 +549,7 @@ const ROUTES = ['home', 'setup', 'history', 'trainer', 'help', 'more'];
 const route = () => { const r = (location.hash || '#home').slice(1); return ROUTES.includes(r) ? r : 'home'; };
 app.go(route());
 window.addEventListener('hashchange', () => { if (!document.querySelector('.sim')) app.go(route()); });
-const netChip = () => { const c = document.querySelector('.netchip'); if (!c) return; c.classList.toggle('on', navigator.onLine); c.lastChild.textContent = navigator.onLine ? 'Online · offline ready' : 'Offline'; };
+const netChip = () => { const c = document.querySelector('.netchip'); if (!c) return; c.classList.toggle('on', navigator.onLine); c.title = navigator.onLine ? 'Online · offline ready' : 'Offline'; c.querySelector('.netlbl').textContent = c.title; };
 window.addEventListener('online', netChip);
 window.addEventListener('offline', netChip);
 

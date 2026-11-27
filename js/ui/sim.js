@@ -110,7 +110,7 @@ export function simScreen(app, scen, opts = {}) {
   R.panel = h('div', { class: 'tabpanel' });
   const ctrl = h('section', { class: 'col-ctrl', 'aria-label': 'Controls' }, tabBar, R.panel);
 
-  const root = h('div', { class: 'sim' }, top, h('div', { class: 'simbody' }, wellCol, main, ctrl), h('div', { class: 'rotate-hint toast' }, 'Rotate the tablet to landscape'));
+  const root = h('div', { class: 'sim' }, top, h('div', { class: 'simbody' }, wellCol, main, ctrl), h('div', { class: 'rotate-hint toast' }, 'Turn the screen to landscape — the simulator needs a wide screen'));
   app.replaceChildren(root);
 
   // ---------- control panels ----------

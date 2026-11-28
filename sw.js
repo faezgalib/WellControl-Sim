@@ -1,5 +1,5 @@
 // Offline cache. The cache name follows the app version, so a new release installs a fresh copy.
-const VERSION = 'wcsim-0.2.1';
+const VERSION = 'wcsim-0.2.2';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './version.json', './css/app.css',
   './js/app.js', './js/store.js', './js/version.js', './js/disclaimer.js',

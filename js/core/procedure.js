@@ -171,3 +171,16 @@ export class Coach {
     };
   }
 }
+
+/**
+ * MAASP coaching while the influx is still below the casing shoe.
+ * Returns { level, show } where level 0 = fine, 1 = within 10 % of MAASP, 2 = above MAASP.
+ * `shown` is the highest level already shown since casing pressure last fell below 80 % of MAASP.
+ */
+export function maaspCheck({ cp, maasp, gasTop, shoe, sealed, shown = 0 }) {
+  if (!sealed || !(maasp > 0) || gasTop === null || gasTop === undefined || !(gasTop > shoe)) return { level: 0, show: false, reset: true };
+  const r = cp / maasp;
+  if (r < 0.8) return { level: 0, show: false, reset: true };
+  const level = r >= 1 ? 2 : r >= 0.9 ? 1 : 0;
+  return { level, show: level > shown, reset: false };
+}
